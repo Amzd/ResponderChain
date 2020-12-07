@@ -2,6 +2,12 @@
 
 Cross-platform first responder handling without subclassing views or making custom ViewRepresentables in SwiftUI
 
+## Features
+
+1. Getting the current first responder through `ResponderChain.firstResponder`
+2. Setting a new first responder through `ResponderChain.firstResponder`
+3. Getting tagged views available for receiveing first responder through `ResponderChain.availableResponders`
+
 ## Example
 
 **SceneDelegate.swift**
