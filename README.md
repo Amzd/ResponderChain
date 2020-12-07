@@ -28,10 +28,10 @@ struct ResponderChainExample: View {
             Text("Selected field: \(chain.firstResponder?.description ?? "Nothing selected")")
             
             // Some views that can become first responder
-            TextField("0", text: .constant("")).responderTag("0")
-            TextField("1", text: .constant("")).responderTag("1")
-            TextField("2", text: .constant("")).responderTag("2")
-            TextField("3", text: .constant("")).responderTag("3")
+            TextField("0", text: .constant(""), onCommit: { chain.firstResponder = "1" }).responderTag("0")
+            TextField("1", text: .constant(""), onCommit: { chain.firstResponder = "2" }).responderTag("1")
+            TextField("2", text: .constant(""), onCommit: { chain.firstResponder = "3" }).responderTag("2")
+            TextField("3", text: .constant(""), onCommit: { chain.firstResponder = nil }).responderTag("3")
             
             // Buttons to change first responder
             HStack {
