@@ -46,6 +46,4 @@ struct ResponderChainExample: View {
 }
 ```
 
-
-
-![gif](ChainResponder.gif)
+<img src="ChainResponder.gif" width="300">
