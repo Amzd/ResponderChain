@@ -2,6 +2,7 @@ Pod::Spec.new do |s|
   s.name             = 'ResponderChain'
   s.version          = '1.0.0'
   s.summary          = 'Cross-platform first responder handling without subclassing views or making custom ViewRepresentables in SwiftUI'
+  s.license = { type: 'MIT' }
   s.homepage         = 'https://github.com/Amzd/ResponderChain'
   s.author           = { 'Casper Zandbergen' => 'info@casperzandbergen.nl' }
   s.source           = { :git => 'https://github.com/amzd/ResponderChain.git', :tag => s.version.to_s }
