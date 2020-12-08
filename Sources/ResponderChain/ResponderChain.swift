@@ -40,16 +40,21 @@ extension UIView {
     var firstResponderPublisher: ResponderPublisher {
         Self._firstResponderPublisher.eraseToAnyPublisher()
     }
+    @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
     private static let _firstResponderPublisher = PassthroughSubject<PlatformResponder?, Never>()
     
     open override func becomeFirstResponder() -> Bool {
         let result = super.becomeFirstResponder()
-        Self._firstResponderPublisher.send(self)
+        if #available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *) {
+            Self._firstResponderPublisher.send(self)
+        }
         return result
     }
     
     open override func resignFirstResponder() -> Bool {
-        Self._firstResponderPublisher.send(nil)
+        if #available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *) {
+            Self._firstResponderPublisher.send(nil)
+        }
         return super.resignFirstResponder()
     }
 }
