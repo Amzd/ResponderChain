@@ -8,12 +8,7 @@
 import Foundation
 import Combine
 import SwiftUI
-#if canImport(Introspect)
-import Introspect
-#elseif canImport(AmzdIntrospect)
-// CocoaPods
 import AmzdIntrospect
-#endif
 
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 typealias ResponderPublisher = AnyPublisher<PlatformResponder?, Never>
