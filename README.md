@@ -10,10 +10,15 @@ Cross-platform first responder handling without subclassing views or making cust
 
 ## Example
 
-**SceneDelegate.swift**
+Attach the ResponderChain as environmentObject
+
 ```swift
 ...
+// In the SceneDelegate or ApplicationDelegate where you have access to the window:
 let rootView = ResponderChainExample().environmentObject(ResponderChain(forWindow: window))
+
+// SwiftUI only:
+ResponderChainExample().withResponderChainForCurrentWindow()
 ...
 ```
 

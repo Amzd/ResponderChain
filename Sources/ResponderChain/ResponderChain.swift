@@ -10,6 +10,8 @@ import Combine
 import SwiftUI
 import AmzdIntrospect
 
+// MARK: Platform specifics
+
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 typealias ResponderPublisher = AnyPublisher<PlatformResponder?, Never>
 
@@ -59,6 +61,27 @@ extension UIView {
     }
 }
 #endif
+
+// MARK: View Extension
+
+@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+extension View {
+    /// Tag the closest sibling view that can become first responder
+    public func responderTag<Tag: Hashable>(_ tag: Tag) -> some View {
+        inject(FindResponderSibling(tag: tag))
+    }
+    
+    /// This attaches the ResponderChain for the current window as environmentObject
+    ///
+    /// Will not show anything for the first frame as it introspects the closest view to get the window
+    ///
+    /// Use `.environmentObject(ResponderChain(forWindow: window))` if possible.
+    public func withResponderChainForCurrentWindow() -> some View {
+        self.modifier(ResponderChainWindowFinder())
+    }
+}
+
+// MARK: ResponderChain
 
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 public class ResponderChain: ObservableObject {
@@ -118,11 +141,23 @@ public class ResponderChain: ObservableObject {
 }
 
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
-extension View {
-    public func responderTag<Tag: Hashable>(_ tag: Tag) -> some View {
-        inject(FindResponderSibling(tag: tag))
+private struct ResponderChainWindowFinder: ViewModifier {
+    @State private var window: PlatformWindow? = nil
+
+    func body(content: Content) -> some View {
+        Group {
+            if let window = window {
+                content.environmentObject(ResponderChain(forWindow: window))
+            } else {
+                EmptyView()
+            }
+        }.introspect(selector: { $0.self }) {
+            self.window = $0.window
+        }
     }
 }
+
+// MARK: - Tag
 
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 private struct FindResponderSibling<Tag: Hashable>: View {
