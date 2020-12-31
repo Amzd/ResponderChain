@@ -133,10 +133,9 @@ private struct FindResponderSibling<Tag: Hashable>: View {
     var body: some View {
         PlatformIntrospectionView(
             selector: { introspectionView in
-                guard let viewHost = Introspect.findViewHost(from: introspectionView) else {
-                    return nil
-                }
-                guard let superview = viewHost.superview,
+                guard
+                    let viewHost = Introspect.findViewHost(from: introspectionView),
+                    let superview = viewHost.superview,
                     let entryIndex = superview.subviews.firstIndex(of: viewHost),
                     entryIndex > 0
                 else {
