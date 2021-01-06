@@ -116,6 +116,8 @@ final class ResponderChainTests: XCTestCase {
         XCTAssert(Self.chain.firstResponder == "1")
         Self.chain.firstResponder = "Something that isn't tagged"
         XCTAssert(Self.chain.firstResponder == nil)
+        
+        XCTAssert(Set(Self.chain.availableResponders) == ["0", "1", "2", "3"])
     }
 
     static var allTests = [
