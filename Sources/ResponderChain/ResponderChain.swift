@@ -30,7 +30,18 @@ extension NSWindow {
     }
 }
 
+extension NSView {
+    /// There is no swizzling needed on macOS
+    static var responderSwizzling: Void = ()
+    
+    var canBecomeFirstResponder: Bool {
+        return canBecomeKeyView
+    }
+}
+
 #elseif os(iOS) || os(tvOS)
+import UIKit
+import SwizzleSwift
 public typealias PlatformWindow = UIWindow
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 public typealias PlatformIntrospectionView = UIKitIntrospectionView
@@ -38,6 +49,13 @@ typealias PlatformResponder = UIResponder
 var canBecomeFirstResponder = \PlatformView.canBecomeFirstResponder
 
 extension UIView {
+    static var responderSwizzling: Void = {
+        Swizzle(UIView.self) {
+            #selector(becomeFirstResponder) <-> #selector(becomeFirstResponder_ResponderChain)
+            #selector(resignFirstResponder) <-> #selector(resignFirstResponder_ResponderChain)
+        }
+    }()
+    
     @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
     var firstResponderPublisher: ResponderPublisher {
         Self._firstResponderPublisher.eraseToAnyPublisher()
@@ -49,19 +67,19 @@ extension UIView {
     @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
     private static let _firstResponderPublisher = CurrentValueSubject<PlatformResponder?, Never>(nil)
     
-    open override func becomeFirstResponder() -> Bool {
-        let result = super.becomeFirstResponder()
+    @objc open func becomeFirstResponder_ResponderChain() -> Bool {
+        let result = becomeFirstResponder_ResponderChain()
         if #available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *) {
             Self._firstResponderPublisher.send(self)
         }
         return result
     }
     
-    open override func resignFirstResponder() -> Bool {
+    @objc open func resignFirstResponder_ResponderChain() -> Bool {
         if #available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *) {
             Self._firstResponderPublisher.send(nil)
         }
-        return super.resignFirstResponder()
+        return resignFirstResponder_ResponderChain()
     }
 }
 #endif
@@ -106,6 +124,7 @@ public class ResponderChain: ObservableObject {
     
     public init(forWindow window: PlatformWindow) {
         self.window = window
+        _ = PlatformView.responderSwizzling
         window.firstResponderPublisher.sink(receiveValue: { [self] responder in
             let tag = responderTag(for: responder)
             setFirstResponderWithoutUpdatingUI(tag)

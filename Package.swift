@@ -15,10 +15,11 @@ let package = Package(
     ],
     dependencies: [
         .package(name: "Introspect", url: "https://github.com/siteline/SwiftUI-Introspect.git", from: "0.1.2"),
+        .package(url: "https://github.com/MarioIannotta/SwizzleSwift", .branch("master")),
         .package(url: "https://github.com/nalexn/ViewInspector", from: "0.6.0"),
     ],
     targets: [
-        .target(name: "ResponderChain", dependencies: ["Introspect"]),
+        .target(name: "ResponderChain", dependencies: ["Introspect", "SwizzleSwift"]),
         .testTarget(name: "ResponderChainTests", dependencies: ["ResponderChain", "ViewInspector"]),
     ]
 )
