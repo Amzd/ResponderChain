@@ -54,7 +54,6 @@ extension UIView {
         }
     }()
     
-    @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
     var firstResponderPublisher: ResponderPublisher {
         Self._firstResponderPublisher.eraseToAnyPublisher()
     }
@@ -62,21 +61,16 @@ extension UIView {
     // I assume that resignFirstResponder is always called before an object is meant to be released.
     // If that is not the case then having a CurrentValueSubject instead of PassthroughSubject will
     // cause the firstResponder to be retained until a new firstResponder is set.
-    @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
     private static let _firstResponderPublisher = CurrentValueSubject<PlatformResponder?, Never>(nil)
     
     @objc open func becomeFirstResponder_ResponderChain() -> Bool {
         let result = becomeFirstResponder_ResponderChain()
-        if #available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *) {
-            Self._firstResponderPublisher.send(self)
-        }
+        Self._firstResponderPublisher.send(self)
         return result
     }
     
     @objc open func resignFirstResponder_ResponderChain() -> Bool {
-        if #available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *) {
-            Self._firstResponderPublisher.send(nil)
-        }
+        Self._firstResponderPublisher.send(nil)
         return resignFirstResponder_ResponderChain()
     }
 }
