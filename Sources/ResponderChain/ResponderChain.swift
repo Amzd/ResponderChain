@@ -8,7 +8,7 @@
 import Foundation
 import Combine
 import SwiftUI
-import AmzdIntrospect
+import Introspect
 
 // MARK: Platform specifics
 

@@ -5,8 +5,8 @@ Pod::Spec.new do |s|
   s.license = { type: 'MIT' }
   s.homepage         = 'https://github.com/Amzd/ResponderChain'
   s.author           = { 'Casper Zandbergen' => 'info@casperzandbergen.nl' }
-  s.source           = { :git => 'https://github.com/amzd/ResponderChain.git', :tag => s.version.to_s }
-  s.dependency 'AmzdIntrospect', '0.1.2'
+  s.source           = { :git => 'https://github.com/Amzd/ResponderChain.git', :tag => s.version.to_s }
+  s.dependency 'Introspect', '0.1.2'
   s.source_files = 'Sources/**/*.swift'
   
   s.swift_version = '5.1'

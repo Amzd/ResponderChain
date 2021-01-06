@@ -14,11 +14,11 @@ let package = Package(
         .library(name: "ResponderChain", targets: ["ResponderChain"]),
     ],
     dependencies: [
-        .package(name: "AmzdIntrospect", url: "https://github.com/Amzd/SwiftUI-Introspect.git", .upToNextMajor(from: "0.1.3"))
+        .package(name: "Introspect", url: "https://github.com/siteline/SwiftUI-Introspect.git", from: "0.1.2"),
         .package(url: "https://github.com/Amzd/ViewInspector", .branch("master"))
     ],
     targets: [
-        .target(name: "ResponderChain", dependencies: ["AmzdIntrospect"]),
+        .target(name: "ResponderChain", dependencies: ["Introspect"]),
         .testTarget(name: "ResponderChainTests", dependencies: ["ResponderChain", "ViewInspector"]),
     ]
 )
