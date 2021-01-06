@@ -175,12 +175,12 @@ public class ResponderChain: ObservableObject {
                 print("Can't find responder for tag \(tag), make sure to set a tag using `.responderTag(_:)`")
                 firstResponder = nil
             }
-        } else if firstResponder == nil {
+        } else if firstResponder == nil, let previousResponder = oldValue.flatMap({ taggedResponders[$0] }) {
+            print("Resigning first responder", oldValue ?? "")
             #if os(macOS)
-                let previousResponder = oldValue.flatMap { taggedResponders[$0] }
                 window.endEditing(for: previousResponder)
             #elseif os(iOS) || os(tvOS)
-                window.endEditing(true)
+                previousResponder.endEditing(true)
             #endif
         }
     }
