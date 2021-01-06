@@ -181,7 +181,9 @@ private struct ResponderChainWindowFinder: ViewModifier {
                 EmptyView()
             }
         }.introspect(selector: { $0.self }) {
-            self.window = $0.window
+            if self.window != $0.window {
+                self.window = $0.window
+            }
         }
     }
 }
