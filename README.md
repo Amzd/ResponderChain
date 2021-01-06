@@ -1,4 +1,4 @@
-# ResponderChain
+# ⛓️ ResponderChain
 
 Cross-platform first responder handling without subclassing views or making custom ViewRepresentables in SwiftUI
 
@@ -8,9 +8,51 @@ Cross-platform first responder handling without subclassing views or making cust
 2. Setting a new first responder through `ResponderChain.firstResponder`
 3. Getting tagged views available for receiveing first responder through `ResponderChain.availableResponders`
 
+## Overview
+
+Attach the ResponderChain as environmentObject.
+
+```swift
+// In the SceneDelegate or ApplicationDelegate where you have access to the window:
+let rootView = Example().environmentObject(ResponderChain(forWindow: window))
+
+// SwiftUI only:
+Example().withResponderChainForCurrentWindow()
+```
+
+Tag views that can become first responder.
+
+```swift
+TextField(...).responderTag("MyTextField")
+```
+
+Check tagged views that are currently available to become first responder.
+
+```swift
+chain.availableResponders.contains("MyList")
+```
+
+Make tagged views become first responder.
+
+```swift
+chain.firstResponder = "MyTextField"
+if chain.firstResponder == nil {
+    print("Failed")
+}
+```
+> This is completely safe, if "MyTextField" was either not available to become first responder or it wasn't tagged properly; `chain.firstResponder` will become `nil`
+
+
+
+Resign first responder.
+
+```swift
+chain.firstResponder = nil
+```
+
 ## Example
 
-Attach the ResponderChain as environmentObject
+Attach the ResponderChain as environmentObject.
 
 ```swift
 ...
