@@ -46,6 +46,7 @@ public typealias PlatformWindow = UIWindow
 public typealias PlatformIntrospectionView = UIKitIntrospectionView
 typealias PlatformResponder = UIResponder
 
+@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 extension UIView {
     static var responderSwizzling: Void = {
         Swizzle(UIView.self) {
