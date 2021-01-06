@@ -107,20 +107,32 @@ public class ResponderChain: ObservableObject {
     public init(forWindow window: PlatformWindow) {
         self.window = window
         window.firstResponderPublisher.sink(receiveValue: { [self] responder in
-            guard let view = responder as? PlatformView else {
-                return firstResponder = nil
-            }
+            let tag = responderTag(for: responder)
+            setFirstResponderWithoutUpdatingUI(tag)
+        }).store(in: &cancellables)
+    }
+    
+    internal func responderTag(for responder: PlatformResponder?) -> AnyHashable? {
+        guard let view = responder as? PlatformView else {
+            return nil
+        }
+        
+        let possibleResponders = taggedResponders.filter {
+            $0.value == view || view.isDescendant(of: $0.value)
+        }
 
-            let possibleResponders = taggedResponders.filter {
-                $0.value == view || view.isDescendant(of: $0.value)
+        let respondersByDistance: [AnyHashable: Int] = possibleResponders.mapValues {
+            var distance = 0
+            var responder: PlatformView? = $0
+            while let step = responder, view.isDescendant(of: step) {
+                responder = step.subviews.first(where: view.isDescendant(of:))
+                distance += 1
             }
-
-            let respondersByDistance: [AnyHashable: Int] = possibleResponders.mapValues {
-                var distance = 0
-                var responder: PlatformView? = $0
-                while let step = responder, view.isDescendant(of: step) {
-                    responder = step.subviews.first(where: view.isDescendant(of:))
-                    distance += 1
+            return distance
+        }
+        
+        return respondersByDistance.min(by: { $0.value < $1.value })?.key
+    }
     
     internal func setFirstResponderWithoutUpdatingUI(_ newFirstResponder: AnyHashable?) {
         shouldUpdateUI = false
