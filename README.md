@@ -1,4 +1,4 @@
-# ResponderChain
+# ⛓️ ResponderChain
 
 Cross-platform first responder handling without subclassing views or making custom ViewRepresentables in SwiftUI
 
