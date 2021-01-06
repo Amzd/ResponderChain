@@ -72,7 +72,7 @@ final class ResponderChainTests: XCTestCase {
     var testView: ResponderChainExample!
     
     func didSetFirstResponder(to tag: AnyHashable?) -> XCTestExpectation {
-        let didSetFirstResponder = XCTestExpectation(description: "Did set ResponderChain.firstResponder on appear")
+        let didSetFirstResponder = XCTestExpectation(description: "Did set ResponderChain.firstResponder and did not fail")
         didSetFirstResponder.expectedFulfillmentCount = 2
         
         Self.chain.$firstResponder.first(where: { $0 == tag }).sink { newFirstResponder in
@@ -99,12 +99,15 @@ final class ResponderChainTests: XCTestCase {
     func testAll() throws {
         wait(for: [didSetFirstResponder(to: "0")], timeout: 0.5)
         XCTAssert(try testView.inspect().find(ViewType.Text.self).string() == "Selected field: 0")
+        
         try testView.inspect().findAll(ViewType.TextField.self)[0].callOnCommit()
         wait(for: [didSetFirstResponder(to: "1")], timeout: 0.5)
         XCTAssert(try testView.inspect().find(ViewType.Text.self).string() == "Selected field: 1")
+        
         try testView.inspect().findAll(ViewType.Button.self)[2].tap()
         wait(for: [didSetFirstResponder(to: "2")], timeout: 0.5)
         XCTAssert(try testView.inspect().find(ViewType.Text.self).string() == "Selected field: 2")
+        
         try testView.inspect().findAll(ViewType.Button.self)[4].tap()
         wait(for: [didSetFirstResponder(to: nil)], timeout: 0.5)
         XCTAssert(try testView.inspect().find(ViewType.Text.self).string() == "Selected field: Nothing selected")
