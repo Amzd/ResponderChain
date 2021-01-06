@@ -247,3 +247,16 @@ private struct FindResponderSibling<Tag: Hashable>: View {
         )
     }
 }
+
+/// Allows direct comparison between an optional AnyHashable and a raw string or number
+///
+/// Example:
+///     chain.firstResponder == "MyTextField"
+///     chain.firstResponder == 5
+///
+public func ==<H: Hashable>(lhs: AnyHashable?, rhs: H) -> Bool {
+    if let lhs = lhs {
+        return lhs == AnyHashable(rhs)
+    }
+    return false
+}

@@ -113,7 +113,7 @@ final class ResponderChainTests: XCTestCase {
         XCTAssert(try testView.inspect().find(ViewType.Text.self).string() == "Selected field: Nothing selected")
         
         Self.chain.firstResponder = "1"
-        XCTAssert(Self.chain.firstResponder == AnyHashable("1"))
+        XCTAssert(Self.chain.firstResponder == "1")
         Self.chain.firstResponder = "Something that isn't tagged"
         XCTAssert(Self.chain.firstResponder == nil)
     }
