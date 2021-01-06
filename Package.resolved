@@ -12,11 +12,11 @@
       },
       {
         "package": "ViewInspector",
-        "repositoryURL": "https://github.com/Amzd/ViewInspector",
+        "repositoryURL": "https://github.com/nalexn/ViewInspector",
         "state": {
-          "branch": "master",
-          "revision": "eaa49374f2ff6204db39f16e73877cd4fcaa921e",
-          "version": null
+          "branch": null,
+          "revision": "ef7874a423f3610a4ce4e396d9a61494f5e96b56",
+          "version": "0.6.0"
         }
       }
     ]
