@@ -111,6 +111,11 @@ final class ResponderChainTests: XCTestCase {
         try testView.inspect().findAll(ViewType.Button.self)[4].tap()
         wait(for: [didSetFirstResponder(to: nil)], timeout: 0.5)
         XCTAssert(try testView.inspect().find(ViewType.Text.self).string() == "Selected field: Nothing selected")
+        
+        Self.chain.firstResponder = "1"
+        XCTAssert(Self.chain.firstResponder == AnyHashable("1"))
+        Self.chain.firstResponder = "Something that isn't tagged"
+        XCTAssert(Self.chain.firstResponder == nil)
     }
 
     static var allTests = [
