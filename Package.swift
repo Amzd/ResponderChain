@@ -15,9 +15,10 @@ let package = Package(
     ],
     dependencies: [
         .package(name: "AmzdIntrospect", url: "https://github.com/Amzd/SwiftUI-Introspect.git", .upToNextMajor(from: "0.1.3"))
+        .package(url: "https://github.com/Amzd/ViewInspector", .branch("master"))
     ],
     targets: [
         .target(name: "ResponderChain", dependencies: ["AmzdIntrospect"]),
-//        .testTarget(name: "ResponderChainTests", dependencies: ["ResponderChain"]),
+        .testTarget(name: "ResponderChainTests", dependencies: ["ResponderChain", "ViewInspector"]),
     ]
 )
