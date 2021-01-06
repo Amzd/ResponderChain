@@ -154,14 +154,10 @@ public class ResponderChain: ObservableObject {
                     firstResponder = nil
                     print("Failed to make \(tag) first responder")
                 }
-                return distance
             } else {
                 print("Can't find responder for tag \(tag), make sure to set a tag using `.responderTag(_:)`")
                 firstResponder = nil
             }
-
-            firstResponder = respondersByDistance.min(by: { $0.value < $1.value })?.key
-        }).store(in: &cancellables)
         } else if firstResponder == nil {
             #if os(macOS)
                 let previousResponder = oldValue.flatMap { taggedResponders[$0] }
