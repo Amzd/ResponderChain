@@ -21,7 +21,6 @@ public typealias PlatformWindow = NSWindow
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 public typealias PlatformIntrospectionView = AppKitIntrospectionView
 typealias PlatformResponder = NSResponder
-var canBecomeFirstResponder = \PlatformView.canBecomeKeyView
 
 extension NSWindow {
     @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
@@ -46,7 +45,6 @@ public typealias PlatformWindow = UIWindow
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 public typealias PlatformIntrospectionView = UIKitIntrospectionView
 typealias PlatformResponder = UIResponder
-var canBecomeFirstResponder = \PlatformView.canBecomeFirstResponder
 
 extension UIView {
     static var responderSwizzling: Void = {
@@ -114,7 +112,7 @@ public class ResponderChain: ObservableObject {
     }
     
     public var availableResponders: [AnyHashable] {
-        taggedResponders.filter { $0.value[keyPath: canBecomeFirstResponder] } .map(\.key)
+        taggedResponders.filter { $0.value.canBecomeFirstResponder } .map(\.key)
     }
     
     private var cancellables = Set<AnyCancellable>()
@@ -229,7 +227,7 @@ private struct FindResponderSibling<Tag: Hashable>: View {
                 
                 func findResponder(in root: PlatformView) -> PlatformView? {
                     for subview in root.subviews {
-                        if subview[keyPath: canBecomeFirstResponder] {
+                        if subview.canBecomeFirstResponder {
                             return subview
                         } else if let responder = findResponder(in: subview) {
                             return responder
@@ -239,7 +237,7 @@ private struct FindResponderSibling<Tag: Hashable>: View {
                 }
                 
                 for subview in superview.subviews[0..<entryIndex].reversed() {
-                    if subview[keyPath: canBecomeFirstResponder] {
+                    if subview.canBecomeFirstResponder {
                         return subview
                     } else if let responder = findResponder(in: subview) {
                         return responder
