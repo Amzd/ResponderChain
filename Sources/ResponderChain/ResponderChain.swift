@@ -91,22 +91,7 @@ extension View {
 public class ResponderChain: ObservableObject {
     @Published public var firstResponder: AnyHashable? {
         didSet {
-            if let tag = firstResponder, tag != oldValue {
-                if let responder = taggedResponders[tag] {
-                    print("making first responder:", tag, responder)
-                    #if os(macOS)
-                        let succeeded = window.makeFirstResponder(responder)
-                    #elseif os(iOS) || os(tvOS)
-                        let succeeded = responder.becomeFirstResponder()
-                    #endif
-                    if !succeeded {
-                        firstResponder = nil
-                        print("Failed to make \(tag) first responder")
-                    }
-                } else {
-                    print("Can't find responder for tag \(tag), make sure to set a tag using `.responderTag(_:)`")
-                }
-            }
+            if shouldUpdateUI { updateUIForNewFirstResponder(oldValue: oldValue) }
         }
     }
     
@@ -116,6 +101,7 @@ public class ResponderChain: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     private var window: PlatformWindow
+    private var shouldUpdateUI: Bool = true
     internal var taggedResponders: [AnyHashable: PlatformView] = [:]
     
     public init(forWindow window: PlatformWindow) {
@@ -135,12 +121,43 @@ public class ResponderChain: ObservableObject {
                 while let step = responder, view.isDescendant(of: step) {
                     responder = step.subviews.first(where: view.isDescendant(of:))
                     distance += 1
+    
+    internal func setFirstResponderWithoutUpdatingUI(_ newFirstResponder: AnyHashable?) {
+        shouldUpdateUI = false
+        firstResponder = newFirstResponder
+        shouldUpdateUI = true
+    }
+    
+    internal func updateUIForNewFirstResponder(oldValue: AnyHashable?) {
+        assert(Thread.isMainThread && shouldUpdateUI)
+        if let tag = firstResponder, tag != oldValue {
+            if let responder = taggedResponders[tag] {
+                print("Making first responder:", tag, responder)
+                #if os(macOS)
+                    let succeeded = window.makeFirstResponder(responder)
+                #elseif os(iOS) || os(tvOS)
+                    let succeeded = responder.becomeFirstResponder()
+                #endif
+                if !succeeded {
+                    firstResponder = nil
+                    print("Failed to make \(tag) first responder")
                 }
                 return distance
+            } else {
+                print("Can't find responder for tag \(tag), make sure to set a tag using `.responderTag(_:)`")
+                firstResponder = nil
             }
 
             firstResponder = respondersByDistance.min(by: { $0.value < $1.value })?.key
         }).store(in: &cancellables)
+        } else if firstResponder == nil {
+            #if os(macOS)
+                let previousResponder = oldValue.flatMap { taggedResponders[$0] }
+                window.endEditing(for: previousResponder)
+            #elseif os(iOS) || os(tvOS)
+                window.endEditing(true)
+            #endif
+        }
     }
 }
 
