@@ -38,7 +38,7 @@ extension NSView {
     }
 }
 
-#elseif os(iOS) || os(tvOS)
+#elseif os(iOS) || os(tvOS) || os(watchOS)
 import UIKit
 import SwizzleSwift
 public typealias PlatformWindow = UIWindow
