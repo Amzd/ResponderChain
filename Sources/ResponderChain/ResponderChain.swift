@@ -72,6 +72,12 @@ extension UIView {
     
     @objc open func resignFirstResponder_ResponderChain() -> Bool {
         Self._firstResponderPublisher.send(nil)
+        guard Self.instancesRespond(to: #selector(UIView.resignFirstResponder_ResponderChain)) else {
+            // UIAlertController somehow calls this but I can't figure out a
+            // way to call an original resignFirstResponder. I haven't found
+            // anything broken with just returning false here.
+            return false
+        }
         return resignFirstResponder_ResponderChain()
     }
 }
