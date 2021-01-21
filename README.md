@@ -4,9 +4,9 @@ Cross-platform first responder handling without subclassing views or making cust
 
 ## Features
 
-1. Getting the current first responder through `ResponderChain.firstResponder`
-2. Setting a new first responder through `ResponderChain.firstResponder`
-3. Getting tagged views available for receiveing first responder through `ResponderChain.availableResponders`
+- **💡 Easy to use:** Get, set and resign first responder simply through an EnvironmentObject.
+- **⏰ Time Saving:** If an underlying view can become first responder all you have to do is tag it; and it works!
+- **👀 Insightful:** Gives insight in which views can become first responder.
 
 ## Overview
 
