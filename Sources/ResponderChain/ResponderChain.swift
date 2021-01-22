@@ -94,31 +94,44 @@ extension View {
     
     /// This attaches the ResponderChain for the current window as environmentObject
     ///
-    /// Will not show anything for the first frame as it introspects the closest view to get the window
-    ///
-    /// Use `.environmentObject(ResponderChain(forWindow: window))` if possible.
-    public func withResponderChainForCurrentWindow() -> some View {
-        self.modifier(ResponderChainWindowFinder())
+    /// Under the hood just wraps a ResponderChainReader around your view
+    public func withResponderChainEnvironmentObject() -> some View {
+        ResponderChainReader(reloadContent: .onlyInitialValue) {
+            self.environmentObject($0)
+        }
     }
 }
 
 // MARK: Preferences
 
+/// Found a responder view that was tagged
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
-struct ResponderChainPreferenceData: Equatable {
-    static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.tag == rhs.tag
-    }
-
-    var responder: PlatformView?
-    var tag: AnyHashable
-}
-
-@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
-struct ResponderChainPreferenceKey: PreferenceKey {
-    static var defaultValue: [ResponderChainPreferenceData] { [] }
+struct FoundResponderPreferenceKey: PreferenceKey {
+    static var defaultValue: [Data] { [] }
     static func reduce(value: inout Value, nextValue: () -> Value) {
         value.append(contentsOf: nextValue())
+    }
+    
+    struct Data: Equatable {
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.tag == rhs.tag
+        }
+
+        var responder: PlatformView?
+        var tag: AnyHashable
+    }
+}
+
+/// A responder was tagged and will return in the future
+@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+struct FutureResponderPreferenceKey: PreferenceKey {
+    static var defaultValue: [Data] { [] }
+    static func reduce(value: inout Value, nextValue: () -> Value) {
+        value.append(contentsOf: nextValue())
+    }
+    
+    struct Data: Equatable {
+        var tag: AnyHashable
     }
 }
 
@@ -126,24 +139,66 @@ struct ResponderChainPreferenceKey: PreferenceKey {
 
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct ResponderChainReader<Content: View>: View {
-    public var content: (ResponderChain) -> Content
-    @State private var chain: ResponderChain? = nil
+    public enum ReloadContent {
+        /// Content closure is called when a new ResponderChain object is created AND when a published property on ResponderChain changes
+        case eachChange
+        /// Content closure is called only when a new ResponderChain object is created
+        case onlyInitialValue
+    }
     
-    public init(@ViewBuilder _ content: @escaping (ResponderChain) -> Content) {
+    public var reloadContent: ReloadContent
+    public var content: (ResponderChain) -> Content
+    
+    @State private var chain = ResponderChain()
+    
+    /// Use this init if you want to add the tagged responders inside
+    /// this reader to a different ResponderChain. This is to enable using one
+    /// ResponderChain for multiple windows on MacOS but you can also use
+    /// this if you have two readers that are far apart but you have a way to bridge
+    /// the ResponderChain.
+    ///
+    /// - parameter reloadContent: How much the content should be reloaded
+    /// - parameter content: Content
+    ///
+    public init(reloadContent: ReloadContent = .eachChange,
+                @ViewBuilder content: @escaping (ResponderChain) -> Content) {
+        self.reloadContent = reloadContent
         self.content = content
+    }
+    
+    /// Use this init if you want to add the tagged responders inside
+    /// this reader to a different ResponderChain. This is to enable using one
+    /// ResponderChain for multiple windows on MacOS but you can also use
+    /// this if you have two readers that are far apart but you have a way to bridge
+    /// the ResponderChain.
+    ///
+    /// There is no point to call this with a nested reader because the only
+    /// advantage of nesting a reader is that you get a local ResponderChain
+    /// without tags from all over your app.
+    ///
+    public init(writingInto chain: ResponderChain,
+                @ViewBuilder content: @escaping () -> Content) {
+        self.reloadContent = .onlyInitialValue
+        self.content = { _ in content() }
+        self._chain = State(wrappedValue: chain)
     }
     
     public var body: some View {
         Group {
-            if let chain = chain {
+            switch reloadContent {
+            case .eachChange:
                 ResponderChainChangesForwarder(content: content, chain: chain)
-            } else {
-                EmptyView()
+            case .onlyInitialValue:
+                content(chain)
             }
-        }.introspect(selector: { $0.self }) {
-            if self.chain?.window != $0.window {
-                self.chain = $0.window.map(ResponderChain.init(forWindow:))
+        }
+        .onPreferenceChange(FoundResponderPreferenceKey.self) { preferences in
+            preferences.forEach { preference in
+                self.chain.tag(preference.responder, with: preference.tag)
             }
+        }
+        .onPreferenceChange(FutureResponderPreferenceKey.self) { preferences in
+            self.chain.expectedResponders = Set(preferences.map(\.tag))
         }
     }
 }
@@ -162,28 +217,70 @@ fileprivate struct ResponderChainChangesForwarder<Content: View>: View {
 
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 public class ResponderChain: ObservableObject {
+    
+    /// First loop: UI/NSView is added to the window and we can introspect to find it and update our state
+    /// Second loop: the state update sends the new responder into the PreferenceKey to the ResponderChainReader
+    public static var runloopsToWaitForRespondersToReturn = 2
+    
     @Published public var firstResponder: AnyHashable? {
         didSet {
-            if shouldUpdateUI { updateUIForNewFirstResponder(oldValue: oldValue) }
+            if shouldUpdateUI {
+                if isRetrying {
+                    print("WARNING: You set a new firstResponder \(firstResponder.debugDescription) while ResponderChain is still retrying to set your last firstResponder \(oldValue.debugDescription) because it was expected to become available. THIS WILL RESULT IN UNDEFINED BEHAVIOUR.")
+                }
+                updateUIForNewFirstResponder(oldValue: oldValue)
+            }
         }
     }
+    
     
     public var availableResponders: [AnyHashable] {
         taggedResponders.filter { $0.value.canBecomeFirstResponder } .map(\.key)
     }
     
-    private var cancellables = Set<AnyCancellable>()
-    fileprivate var window: PlatformWindow
-    private var shouldUpdateUI: Bool = true
-    internal var taggedResponders: [AnyHashable: PlatformView] = [:]
+    /// If you set the firstResponder before the view is available
+    /// then ResponderChain will retry to make the view first responder
+    /// when it becomes available. This function will call it's block after the
+    /// ResponderChain is done retrying. At that point you can check if
+    /// setting firstResponder was successful by comparing it to nil.
+    public func afterRetrying(_ block: @escaping () -> Void) {
+        if isRetrying {
+            DispatchQueue.main.async {
+                self.afterRetrying(block)
+            }
+        } else {
+            block()
+        }
+    }
     
-    public init(forWindow window: PlatformWindow) {
-        self.window = window
+    private weak var actualFirstResponder: PlatformView?
+    
+    private var responderPublishers: [AnyHashable: AnyCancellable] = [:]
+    private var shouldUpdateUI: Bool = true
+    private var taggedResponders: [AnyHashable: PlatformView] = [:]
+    /// Responders that will be set in the future (In max 2 runloops)
+    fileprivate var expectedResponders: Set<AnyHashable> = []
+    private var isRetrying = false
+    
+    fileprivate init() {
         _ = PlatformView.responderSwizzling
-        window.firstResponderPublisher.sink(receiveValue: { [self] responder in
-            let tag = responderTag(for: responder)
-            setFirstResponderWithoutUpdatingUI(tag)
-        }).store(in: &cancellables)
+    }
+    
+    internal func tag(_ responder: PlatformView?, with tag: AnyHashable) {
+        taggedResponders[tag] = responder
+        guard let window = responder?.window else { return }
+        attachResponderListener(to: window)
+    }
+    
+    internal func attachResponderListener(to window: PlatformWindow) {
+        let id = Unmanaged.passUnretained(window).toOpaque()
+        guard responderPublishers[id] == nil else { return }
+        let cancellable = window.firstResponderPublisher.sink(receiveValue: { [weak self] responder in
+            self?.actualFirstResponder = responder as? PlatformView
+            let tag = self?.responderTag(for: responder)
+            self?.setFirstResponderWithoutUpdatingUI(tag)
+        })
+        responderPublishers[id] = cancellable
     }
     
     internal func responderTag(for responder: PlatformResponder?) -> AnyHashable? {
@@ -209,18 +306,22 @@ public class ResponderChain: ObservableObject {
     }
     
     internal func setFirstResponderWithoutUpdatingUI(_ newFirstResponder: AnyHashable?) {
+        guard !isRetrying else { return } // Retry will force an update after it's done
         shouldUpdateUI = false
         firstResponder = newFirstResponder
         shouldUpdateUI = true
     }
     
-    internal func updateUIForNewFirstResponder(oldValue: AnyHashable?) {
+    internal func updateUIForNewFirstResponder(oldValue: AnyHashable?,
+                                               retry: Int = runloopsToWaitForRespondersToReturn) {
         assert(Thread.isMainThread && shouldUpdateUI)
         if let tag = firstResponder, tag != oldValue {
             if let responder = taggedResponders[tag] {
                 print("Making first responder:", tag, responder)
                 #if os(macOS)
-                    let succeeded = window.makeFirstResponder(responder)
+                    #warning("TODO: Test multiple windows")
+                    responder.window?.makeKey()
+                    let succeeded = responder.window?.makeFirstResponder(responder) ?? false
                 #elseif os(iOS) || os(tvOS)
                     let succeeded = responder.becomeFirstResponder()
                 #endif
@@ -228,17 +329,31 @@ public class ResponderChain: ObservableObject {
                     firstResponder = nil
                     print("Failed to make \(tag) first responder")
                 }
+            } else if expectedResponders.contains(tag), retry >= 0 {
+                isRetrying = true
+                print("Expected to receive responder for tag \(tag), within \(retry) runloops so ResponderChain will retry to make firstResponder the next runloop")
+                DispatchQueue.main.async {
+                    self.isRetrying = false
+                    self.updateUIForNewFirstResponder(oldValue: oldValue, retry: retry - 1)
+                }
             } else {
                 print("Can't find responder for tag \(tag), make sure to set a tag using `.responderTag(_:)`")
+                if expectedResponders.contains(tag) {
+                    print("The tag is still expected to return in the future but we ran out of loops to wait for it, you can raise ResponderChain.runloopsToWaitForRespondersToReturn to debug if it will eventually return")
+                }
                 firstResponder = nil
             }
-        } else if firstResponder == nil, let previousResponder = oldValue.flatMap({ taggedResponders[$0] }) {
-            print("Resigning first responder", oldValue ?? "")
+        } else if firstResponder == nil {
+            let previousResponder = oldValue.flatMap({ taggedResponders[$0] }) ?? actualFirstResponder
+            print("Resigning first responder", oldValue ?? actualFirstResponder ?? "NO RESPONDER FOUND")
+            #warning("TODO: Test resigning responder that wasn't tagged")
             #if os(macOS)
-                window.endEditing(for: previousResponder)
+                previousResponder?.window?.endEditing(for: previousResponder)
             #elseif os(iOS) || os(tvOS)
-                previousResponder.endEditing(true)
+                previousResponder?.endEditing(true)
             #endif
+        } else {
+            print("Tried setting the same responder so ResponderChain did not act")
         }
     }
 }
@@ -246,34 +361,18 @@ public class ResponderChain: ObservableObject {
 // MARK: - Introspection
 
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
-private struct ResponderChainWindowFinder: ViewModifier {
-    @State private var window: PlatformWindow? = nil
-
-    func body(content: Content) -> some View {
-        Group {
-            if let window = window {
-                content.environmentObject(ResponderChain(forWindow: window))
-            } else {
-                EmptyView()
-            }
-        }.introspect(selector: { $0.self }) {
-            if self.window != $0.window {
-                self.window = $0.window
-            }
-        }
-    }
-}
-
-@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 private struct FindResponderSibling<Tag: Hashable>: View {
     @EnvironmentObject var responderChain: ResponderChain
     
     var tag: Tag
     @State private var responder: PlatformView?
+    /// Indicates if we're sure to find a responder in the future
+    @State private var willFindResponder = true
     
     var body: some View {
         PlatformIntrospectionView(
             selector: { introspectionView in
+                self.willFindResponder = false
                 guard
                     let viewHost = Introspect.findViewHost(from: introspectionView),
                     let superview = viewHost.superview,
@@ -309,10 +408,23 @@ private struct FindResponderSibling<Tag: Hashable>: View {
                     self.responder = responder
                 }
             }
-        ).background(Color.clear.preference(
-            key: ResponderChainPreferenceKey.self,
-            value: [.init(responder: self.responder, tag: self.tag)]
-        ))
+        )
+        .background(Group {
+            if let responder = responder {
+                Color.clear.preference(
+                    key: FoundResponderPreferenceKey.self,
+                    value: [.init(responder: responder, tag: tag)]
+                )
+            }
+        })
+        .background(Group {
+            if willFindResponder {
+                Color.clear.preference(
+                    key: FutureResponderPreferenceKey.self,
+                    value: [.init(tag: tag)]
+                )
+            }
+        })
     }
 }
 
@@ -329,4 +441,22 @@ public func ==<H: Hashable>(lhs: AnyHashable?, rhs: H) -> Bool {
         return lhs == AnyHashable(rhs)
     }
     return false
+}
+
+// MARK: - Deprecated
+
+@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+extension ResponderChain {
+    @available(swift, obsoleted: 1.0, message: "Use `View.withResponderChainEnvironmentObject()` or the ResponderChainReader View inside your Views body. ResponderChain no longer cares about what window it is in.")
+    public convenience init(forWindow _: PlatformWindow) {
+        fatalError("Use `View.withResponderChainEnvironmentObject()` or the ResponderChainReader View inside your Views body")
+    }
+}
+
+@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+extension View {
+    @available(*, deprecated, renamed: "withResponderChainEnvironmentObject", message: "ResponderChain no longer cares about what window it is in.")
+    public func withResponderChainForCurrentWindow() -> some View {
+        self.withResponderChainEnvironmentObject()
+    }
 }

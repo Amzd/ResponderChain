@@ -9,35 +9,37 @@ struct ResponderChainExample: View, Inspectable {
     @ObservedObject var chain: ResponderChain
     
     var body: some View {
-        VStack(spacing: 20) {
-            // Show which view is first responder
-            Text("Selected field: \(chain.firstResponder?.description ?? "Nothing selected")")
-            
-            // Some views that can become first responder
-            TextField("0", text: .constant(""), onCommit: { chain.firstResponder = "1" }).responderTag("0")
-            TextField("1", text: .constant(""), onCommit: { chain.firstResponder = "2" }).responderTag("1")
-            TextField("2", text: .constant(""), onCommit: { chain.firstResponder = "3" }).responderTag("2")
-            TextField("3", text: .constant(""), onCommit: { chain.firstResponder = nil }).responderTag("3")
-            
-            // Buttons to change first responder
-            HStack {
-                Button("Select 0", action: { chain.firstResponder = "0" })
-                Button("Select 1", action: { chain.firstResponder = "1" })
-                Button("Select 2", action: { chain.firstResponder = "2" })
-                Button("Select 3", action: { chain.firstResponder = "3" })
-                Button("Select Nothing", action: { chain.firstResponder = nil })
+        ResponderChainReader(writingInto: chain) {
+            VStack(spacing: 20) {
+                // Show which view is first responder
+                Text("Selected field: \(chain.firstResponder?.description ?? "Nothing selected")")
+                
+                // Some views that can become first responder
+                TextField("0", text: .constant(""), onCommit: { chain.firstResponder = "1" }).responderTag("0")
+                TextField("1", text: .constant(""), onCommit: { chain.firstResponder = "2" }).responderTag("1")
+                TextField("2", text: .constant(""), onCommit: { chain.firstResponder = "3" }).responderTag("2")
+                TextField("3", text: .constant(""), onCommit: { chain.firstResponder = nil }).responderTag("3")
+                
+                // Buttons to change first responder
+                HStack {
+                    Button("Select 0", action: { chain.firstResponder = "0" })
+                    Button("Select 1", action: { chain.firstResponder = "1" })
+                    Button("Select 2", action: { chain.firstResponder = "2" })
+                    Button("Select 3", action: { chain.firstResponder = "3" })
+                    Button("Select Nothing", action: { chain.firstResponder = nil })
+                }
             }
-        }
-        .environmentObject(chain)
-        .padding()
-        .onAppear {
-            // Set first responder on appear
-            DispatchQueue.main.async {
+            .padding()
+            .onAppear {
+                // Set first responder on appear
                 chain.firstResponder = "0"
             }
         }
     }
 }
+
+@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+extension ResponderChainReader: Inspectable {}
 
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 final class ResponderChainTests: XCTestCase {
@@ -48,15 +50,19 @@ final class ResponderChainTests: XCTestCase {
         super.setUp()
         if Self.chain == nil {
             let didSetResponderChain = XCTestExpectation(description: "Did set ResponderChain")
-            let windowGrabber = EmptyView().introspect(selector: { $0.self }) {
+            let didSetWindow = XCTestExpectation(description: "Did set Window")
+            let windowGrabber = ResponderChainReader(reloadContent: .onlyInitialValue) { chain -> EmptyView in
+                Self.chain = chain
+                didSetResponderChain.fulfill()
+                return EmptyView()
+            }.introspect(selector: { $0.self }) {
                 if let window = $0.window {
-                    Self.chain = ResponderChain(forWindow: window)
                     Self.window = window
-                    didSetResponderChain.fulfill()
+                    didSetWindow.fulfill()
                 }
             }
             ViewHosting.host(view: windowGrabber)
-            wait(for: [didSetResponderChain], timeout: 0.1)
+            wait(for: [didSetResponderChain, didSetWindow], timeout: 2)
         }
         
         // Every test gets a new view
@@ -71,9 +77,9 @@ final class ResponderChainTests: XCTestCase {
     var cancellables: Set<AnyCancellable> = []
     var testView: ResponderChainExample!
     
-    func didSetFirstResponder(to tag: AnyHashable?) -> XCTestExpectation {
+    func didSetFirstResponder(to tag: AnyHashable?) -> [XCTestExpectation] {
         let didSetFirstResponder = XCTestExpectation(description: "Did set ResponderChain.firstResponder and did not fail")
-        didSetFirstResponder.expectedFulfillmentCount = 2
+        let windowReportedFirstResponder = XCTestExpectation(description: "Window reported correct firstResponder")
         
         Self.chain.$firstResponder.first(where: { $0 == tag }).sink { newFirstResponder in
             DispatchQueue.main.async {
@@ -88,28 +94,30 @@ final class ResponderChainTests: XCTestCase {
             DispatchQueue.main.async {
                 // If setting the firstResponder failed, chain.firstResponder will be nil here
                 if Self.chain.firstResponder == Self.chain.responderTag(for: view) {
-                    didSetFirstResponder.fulfill()
+                    windowReportedFirstResponder.fulfill()
                 }
             }
         }.store(in: &self.cancellables)
         
-        return didSetFirstResponder
+        return [didSetFirstResponder, windowReportedFirstResponder]
     }
     
     func testAll() throws {
-        wait(for: [didSetFirstResponder(to: "0")], timeout: 0.5)
+        print("attach didSetFirstResponder 0")
+        wait(for: didSetFirstResponder(to: "0"), timeout: 1)
+        
         XCTAssert(try testView.inspect().find(ViewType.Text.self).string() == "Selected field: 0")
         
         try testView.inspect().findAll(ViewType.TextField.self)[0].callOnCommit()
-        wait(for: [didSetFirstResponder(to: "1")], timeout: 0.5)
+        wait(for: didSetFirstResponder(to: "1"), timeout: 0.5)
         XCTAssert(try testView.inspect().find(ViewType.Text.self).string() == "Selected field: 1")
         
         try testView.inspect().findAll(ViewType.Button.self)[2].tap()
-        wait(for: [didSetFirstResponder(to: "2")], timeout: 0.5)
+        wait(for: didSetFirstResponder(to: "2"), timeout: 0.5)
         XCTAssert(try testView.inspect().find(ViewType.Text.self).string() == "Selected field: 2")
         
         try testView.inspect().findAll(ViewType.Button.self)[4].tap()
-        wait(for: [didSetFirstResponder(to: nil)], timeout: 0.5)
+        wait(for: didSetFirstResponder(to: nil), timeout: 0.5)
         XCTAssert(try testView.inspect().find(ViewType.Text.self).string() == "Selected field: Nothing selected")
         
         Self.chain.firstResponder = "1"
