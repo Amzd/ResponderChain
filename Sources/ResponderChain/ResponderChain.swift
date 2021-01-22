@@ -102,6 +102,62 @@ extension View {
     }
 }
 
+// MARK: Preferences
+
+@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+struct ResponderChainPreferenceData: Equatable {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.tag == rhs.tag
+    }
+
+    var responder: PlatformView?
+    var tag: AnyHashable
+}
+
+@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+struct ResponderChainPreferenceKey: PreferenceKey {
+    static var defaultValue: [ResponderChainPreferenceData] { [] }
+    static func reduce(value: inout Value, nextValue: () -> Value) {
+        value.append(contentsOf: nextValue())
+    }
+}
+
+// MARK: ResponderChainReader
+
+@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+public struct ResponderChainReader<Content: View>: View {
+    public var content: (ResponderChain) -> Content
+    @State private var chain: ResponderChain? = nil
+    
+    public init(@ViewBuilder _ content: @escaping (ResponderChain) -> Content) {
+        self.content = content
+    }
+    
+    public var body: some View {
+        Group {
+            if let chain = chain {
+                ResponderChainChangesForwarder(content: content, chain: chain)
+            } else {
+                EmptyView()
+            }
+        }.introspect(selector: { $0.self }) {
+            if self.chain?.window != $0.window {
+                self.chain = $0.window.map(ResponderChain.init(forWindow:))
+            }
+        }
+    }
+}
+
+@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+fileprivate struct ResponderChainChangesForwarder<Content: View>: View {
+    var content: (ResponderChain) -> Content
+    @ObservedObject var chain: ResponderChain
+    
+    var body: some View {
+        content(chain)
+    }
+}
+
 // MARK: ResponderChain
 
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
@@ -117,7 +173,7 @@ public class ResponderChain: ObservableObject {
     }
     
     private var cancellables = Set<AnyCancellable>()
-    private var window: PlatformWindow
+    fileprivate var window: PlatformWindow
     private var shouldUpdateUI: Bool = true
     internal var taggedResponders: [AnyHashable: PlatformView] = [:]
     
@@ -187,6 +243,8 @@ public class ResponderChain: ObservableObject {
     }
 }
 
+// MARK: - Introspection
+
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 private struct ResponderChainWindowFinder: ViewModifier {
     @State private var window: PlatformWindow? = nil
@@ -206,13 +264,12 @@ private struct ResponderChainWindowFinder: ViewModifier {
     }
 }
 
-// MARK: - Tag
-
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 private struct FindResponderSibling<Tag: Hashable>: View {
     @EnvironmentObject var responderChain: ResponderChain
     
     var tag: Tag
+    @State private var responder: PlatformView?
     
     var body: some View {
         PlatformIntrospectionView(
@@ -248,11 +305,18 @@ private struct FindResponderSibling<Tag: Hashable>: View {
                 return nil
             },
             customize: { responder in
-                responderChain.taggedResponders[tag] = responder
+                if self.responder != responder {
+                    self.responder = responder
+                }
             }
-        )
+        ).background(Color.clear.preference(
+            key: ResponderChainPreferenceKey.self,
+            value: [.init(responder: self.responder, tag: self.tag)]
+        ))
     }
 }
+
+// MARK: - Helper
 
 /// Allows direct comparison between an optional AnyHashable and a raw string or number
 ///
