@@ -10,14 +10,17 @@ Cross-platform first responder handling without subclassing views or making cust
 
 ## Overview
 
-Attach the ResponderChain as environmentObject.
+Create a ResponderChainReader or attach the ResponderChain as environmentObject.
 
 ```swift
-// In the SceneDelegate or ApplicationDelegate where you have access to the window:
-let rootView = Example().environmentObject(ResponderChain(forWindow: window))
+ResponderChainReader { chain in
+    // ...
+}
 
-// SwiftUI only:
-Example().withResponderChainForCurrentWindow()
+// or
+
+// This just wraps the Example view in a ResponderChainReader and attaches the ResponderChain as environmentObject
+Example().withResponderChainEnvironmentObject()
 ```
 
 Tag views that can become first responder.
@@ -36,12 +39,14 @@ Make tagged views become first responder.
 
 ```swift
 chain.firstResponder = "MyTextField"
-if chain.firstResponder == nil {
-    print("Failed")
+chain.afterRetrying {
+    if chain.firstResponder == nil {
+        print("Failed")
+    }
 }
 ```
-> This is completely safe, if "MyTextField" was either not available to become first responder or it wasn't tagged properly; `chain.firstResponder` will become `nil`
-
+> **Note:** This is completely safe, if "MyTextField" was either not available to become first responder or it wasn't tagged properly; `chain.firstResponder` will become `nil`
+> **Note 2:** In most cases setting the firstResponder will be synchronous and you do not have to wait for retrying, read more about it under #Retrying
 
 
 Resign first responder.
@@ -49,6 +54,24 @@ Resign first responder.
 ```swift
 chain.firstResponder = nil
 ```
+
+## Retrying
+
+ResponderChain 2.0.0 will retry to set the firstResponder if it hasn't received but expects to receive the underlying responder for the tagged SwiftUI view.
+
+### Why is this needed
+
+This is needed because SwiftUI calls onAppear before ViewRepresentables are inserted into the UIKit/AppKit hierarchy.
+
+### How does this work
+
+Runloop 1: onAppear and ViewRepresentable.updateView are called. At this point we let the ResponderChainReader know we expect to find a responder
+Runloop 2: ViewRepresentable is inserted in UIKit/AppKit hierarchy so we look for the responder and update the State variable with the found responder.
+Runloop 3: We send the found responder (if any) to the ResponderChainReader and let it know we no longer expect to find a responder.
+
+When you set a new firtResponder that ResponderChain doesn't have a responder for yet it checks if it is expected to receive a responder for that tag. If true; the ResponderChain schedules a retry in the next runloop for a maximum of two runloops.
+
+Use ResponderChain.afterRetrying to get a callback when it's done with this behaviour.
 
 ## Example
 
