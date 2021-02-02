@@ -1,9 +1,8 @@
 
 name: Cocoapods release
 on:
-  push:
-    paths: 
-      "ResponderChain.podspec"
+  workflow_dispatch:
+  release:
     
 jobs:
   build:  
