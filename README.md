@@ -49,6 +49,7 @@ Resign first responder.
 ```swift
 chain.firstResponder = nil
 ```
+> **Note:** This only works if the current firstResponder was tagged.
 
 ## Example
 
