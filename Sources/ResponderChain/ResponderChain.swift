@@ -119,7 +119,7 @@ public class ResponderChain: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var window: PlatformWindow
     private var shouldUpdateUI: Bool = true
-    internal var taggedResponders: [AnyHashable: PlatformView] = [:]
+    @Published internal var taggedResponders: [AnyHashable: PlatformView] = [:]
     
     public init(forWindow window: PlatformWindow) {
         self.window = window
