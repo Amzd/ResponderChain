@@ -1,3 +1,9 @@
+As of June 7 2021 this functionality is in the SwiftUI 3 beta. https://developer.apple.com/documentation/SwiftUI/FocusState
+
+The Apple implementation is a bit different from ResponderChain but switching over looks to be quite easy.
+
+Also the Apple implementation only supports iOS 15 so I think this repo is still useful for backwards compatibility.
+
 # ⛓️ ResponderChain
 
 Cross-platform first responder handling without subclassing views or making custom ViewRepresentables in SwiftUI
